@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "skills": {
+    "autter-runtime-setup": {
+      "source": "./autter-skills",
+      "sourceType": "local",
+      "computedHash": "edacfe82d705470bb796812826f7d6ae44d3e115ffe396e06946e4c521a442ae"
+    },
+    "otel-browser-style": {
+      "source": "./autter-skills",
+      "sourceType": "local",
+      "computedHash": "935a7ae52db898ec914ebaaf8b74833a30b5613d6b02bbd4f229d0944f844cb7"
+    },
+    "otel-generic-style": {
+      "source": "./autter-skills",
+      "sourceType": "local",
+      "computedHash": "9cc355d1e3332fb545f04163deaef74e02c7398f7fdd28fd51d77f8cad8c5f5f"
+    },
+    "otel-go-rust-style": {
+      "source": "./autter-skills",
+      "sourceType": "local",
+      "computedHash": "49682f0f87646b7e5798fbf3957704b4df34e64911561be9cecfa136a643d6cb"
+    },
+    "otel-node-style": {
+      "source": "./autter-skills",
+      "sourceType": "local",
+      "computedHash": "9e8b29059cf201a426b9325a433f856af80e17e95e39b28eccb0c0fcef991008"
+    },
+    "otel-python-style": {
+      "source": "./autter-skills",
+      "sourceType": "local",
+      "computedHash": "c47d6c71c0c5ffe6777f29e4e3d48b051084e711de3aaa0b54334814fe79c51c"
+    }
+  }
+}

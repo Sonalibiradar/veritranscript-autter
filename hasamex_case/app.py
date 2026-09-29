@@ -18,8 +18,10 @@ from core.llm import (
     is_demo_mode,
     MODEL,
 )
+from core.observability import init_observability
 
 load_dotenv()
+init_observability()
 
 st.set_page_config(page_title="Expert Call Analyser", layout="wide")
 st.title("🎙️ Expert Call Transcript Analyser")
@@ -88,6 +90,9 @@ with st.sidebar:
         st.success(f"🟢 **Claude Connected** (`{MODEL}`)")
     else:
         st.warning("⚠️ Enter an Anthropic API Key or enable **Demo Mode** above.")
+
+    if os.environ.get("AUTTER_RUNTIME_KEY"):
+        st.caption("🛡️ **Autter Runtime**: Observability & LLM Tracing Active")
 
 
 def quote_badge(v):

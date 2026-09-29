@@ -14,8 +14,13 @@ import json
 import re
 from typing import List, Dict
 
-from .demo_data import DEMO_GUIDE_ANSWERS, DEMO_THEMES, get_demo_freeform_answer
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, Status, StatusCode
 
+from .demo_data import DEMO_GUIDE_ANSWERS, DEMO_THEMES, get_demo_freeform_answer
+from .observability import capture_warning
+
+tracer = trace.get_tracer("hasamex-case-llm")
 MODEL = os.environ.get("LLM_MODEL", "claude-sonnet-4-5")
 _client = None
 _demo_mode = False
@@ -60,22 +65,42 @@ def _get_client():
 
 def call_llm(system: str, user: str, max_tokens: int = 1000) -> str:
     client = _get_client()
-    try:
-        resp = client.messages.create(
-            model=MODEL,
-            max_tokens=max_tokens,
-            system=system,
-            messages=[{"role": "user", "content": user}],
-        )
-        return "".join(block.text for block in resp.content if block.type == "text")
-    except Exception as e:
-        error_msg = str(e)
-        if "authentication_error" in error_msg or "invalid x-api-key" in error_msg:
-            raise RuntimeError(
-                "Invalid Anthropic API Key (401 Authentication Error). "
-                "Please check your API key in .env / the sidebar, or toggle 'Demo Mode' in the sidebar to run without an active key."
-            ) from e
-        raise e
+    with tracer.start_as_current_span(
+        f"chat {MODEL}",
+        kind=SpanKind.CLIENT,
+        attributes={
+            "gen_ai.operation.name": "chat",
+            "gen_ai.system": "anthropic",
+            "gen_ai.request.model": MODEL,
+            "gen_ai.request.max_tokens": max_tokens,
+        },
+    ) as span:
+        try:
+            resp = client.messages.create(
+                model=MODEL,
+                max_tokens=max_tokens,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+            )
+            if hasattr(resp, "usage") and resp.usage:
+                if hasattr(resp.usage, "input_tokens"):
+                    span.set_attribute("gen_ai.usage.input_tokens", resp.usage.input_tokens)
+                if hasattr(resp.usage, "output_tokens"):
+                    span.set_attribute("gen_ai.usage.output_tokens", resp.usage.output_tokens)
+            if hasattr(resp, "model"):
+                span.set_attribute("gen_ai.response.model", resp.model)
+
+            return "".join(block.text for block in resp.content if block.type == "text")
+        except Exception as e:
+            span.record_exception(e)
+            span.set_status(Status(StatusCode.ERROR, str(e)))
+            error_msg = str(e)
+            if "authentication_error" in error_msg or "invalid x-api-key" in error_msg:
+                raise RuntimeError(
+                    "Invalid Anthropic API Key (401 Authentication Error). "
+                    "Please check your API key in .env / the sidebar, or toggle 'Demo Mode' in the sidebar to run without an active key."
+                ) from e
+            raise e
 
 
 def _extract_json(raw: str) -> Dict:
@@ -148,6 +173,7 @@ Respond with the JSON object only."""
     except Exception as e:
         # Fallback to demo answer if available, else return error
         if (q_num, tid) in DEMO_GUIDE_ANSWERS:
+            capture_warning("llm.guide_answer.fallback", f"LLM error: {e}. Falling back to demo answer.")
             return DEMO_GUIDE_ANSWERS[(q_num, tid)]
         return {"covered": False, "answer": "", "quotes": [], "_raw_error": str(e)}
 
@@ -198,6 +224,7 @@ Respond with the JSON object only."""
         return _extract_json(raw)
     except Exception as e:
         if q_num in DEMO_THEMES:
+            capture_warning("llm.themes.fallback", f"LLM error: {e}. Falling back to demo themes.")
             return DEMO_THEMES[q_num]
         return {"common_themes": [], "disagreements": [], "_raw_error": str(e)}
 
@@ -249,5 +276,6 @@ Respond with the JSON object only."""
     except Exception as e:
         demo_res = get_demo_freeform_answer(question)
         if demo_res.get("covered"):
+            capture_warning("llm.freeform.fallback", f"LLM error: {e}. Falling back to demo freeform answer.")
             return demo_res
         return {"covered": False, "answer": "", "quotes": [], "_raw_error": str(e)}
